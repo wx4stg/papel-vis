@@ -8,7 +8,7 @@ from cartopy import feature as cfeat
 from metpy.plots import USCOUNTIES
 import xarray as xr
 import numpy as np
-from pyxlma.coords import RadarCoordinateSystem
+from pyxlma.coords import RadarCoordinateSystem, TangentPlaneCartesianSystem
 import pandas as pd
 from scipy import stats
 import multiprocessing as mp
@@ -17,27 +17,31 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-files = sorted(listdir('rax'))
-fileds = ['rax/'+f for f in files if f.endswith('-D.nc')]
-fileps = ['rax/'+f for f in files if f.endswith('-P.nc')]
-filers = ['rax/'+f for f in files if f.endswith('-R.nc')]
-filevs = ['rax/'+f for f in files if f.endswith('-V.nc')]
-filews = ['rax/'+f for f in files if f.endswith('-W.nc')]
-filezs = ['rax/'+f for f in files if f.endswith('-Z.nc')]
+files = sorted(listdir('px1k'))
+fileds = ['px1k/'+f for f in files if f.endswith('-D.nc')]
+fileps = ['px1k/'+f for f in files if f.endswith('-P.nc')]
+filers = ['px1k/'+f for f in files if f.endswith('-R.nc')]
+filevs = ['px1k/'+f for f in files if f.endswith('-V.nc')]
+filews = ['px1k/'+f for f in files if f.endswith('-W.nc')]
+filezs = ['px1k/'+f for f in files if f.endswith('-Z.nc')]
+
+
+rax_elevation_m = 380
+px_elevation_m = 318
 
 totalf = len(fileds)
 
 def makeImage(k):
-    if '-E' not in fileds[k]:
+    if '-E' not in fileds[k] and '-A' not in fileds[k]:
         print('Non-ppi file '+fileds[k])
         return
     if '-E90.0' in fileds[k]:
         print('Vertically pointing file '+fileds[k])
         return
-    print(f'Processing {len(listdir('raxout/'))}/{totalf}, {len(listdir('raxout/'))/totalf*100:.2f}%')
+    print(f'Processing {len(listdir('pxout/'))}/{totalf}, {len(listdir('pxout/'))/totalf*100:.2f}%')
     d = xr.open_dataset(fileds[k])
     time = pd.Timestamp(np.array([d.Time]).astype('datetime64[s]')[0]).to_pydatetime()
-    saveFilePath = time.strftime('raxout/%Y%m%d_%H%M%S.png')
+    saveFilePath = time.strftime('pxout/%Y%m%d_%H%M%S.png')
     if path.exists(saveFilePath):
         return
     p = xr.open_dataset(fileps[k])
@@ -93,37 +97,70 @@ def makeImage(k):
         'vmax' : 180
     }]
 
-
     px = 1/plt.rcParams['figure.dpi']
-    fig, axs = plt.subplots(3, 2, subplot_kw={'projection': ccrs.LambertConformal()})
-    idx = 0
-    for i in range(3):
-        for j in range(2):
-            ax = axs[i, j]
-            thisfield = all_fields[idx]
-            data = thisfield['data']
-            
-            t_start = np.array([data.Time]).astype('datetime64[s]')[0]
-            rng = np.matmul(data.Gate.data.reshape(-1, 1), data.GateWidth.data.reshape(1, -1))
-            az = np.tile(data.Azimuth.data, (rng.shape[0], 1))
-            el = np.tile(data.Elevation.data, (rng.shape[0], 1))
-            rcs = RadarCoordinateSystem(data.Latitude, data.Longitude, 0)
-            lon, lat, alt = rcs.toLonLatAlt(rng, az, el)
-            lon = np.array(lon).reshape(az.shape)
-            lat = np.array(lat).reshape(az.shape)
-            alt = np.array(alt).reshape(az.shape)
+    if '-E' in fileds[k]:
+        fig, axs = plt.subplots(3, 2, subplot_kw={'projection': ccrs.LambertConformal()})
+        idx = 0
+        for i in range(3):
+            for j in range(2):
+                ax = axs[i, j]
+                thisfield = all_fields[idx]
+                data = thisfield['data']
+                
+                rng = np.matmul(data.Gate.data.reshape(-1, 1), data.GateWidth.data.reshape(1, -1))
+                az = np.tile(data.Azimuth.data, (rng.shape[0], 1))
+                el = np.tile(data.Elevation.data, (rng.shape[0], 1))
+                rcs = RadarCoordinateSystem(data.Latitude, data.Longitude, 0)
+                lon, lat, alt = rcs.toLonLatAlt(rng, az, el)
+                lon = np.array(lon).reshape(az.shape)
+                lat = np.array(lat).reshape(az.shape)
+                alt = np.array(alt).reshape(az.shape)
 
 
-            colorvar = np.ma.masked_array(data[thisfield['varname']].data, data[thisfield['varname']].data <= -99900.0).T
+                colorvar = np.ma.masked_array(data[thisfield['varname']].data, data[thisfield['varname']].data <= -99900.0).T
 
-            handle = ax.pcolormesh(lon, lat, colorvar, vmin=thisfield['vmin'], vmax=thisfield['vmax'], cmap=thisfield['cmap'], transform=ccrs.PlateCarree())
-            ax.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
-            fig.colorbar(handle, label=thisfield['label'])
-            idx = idx+1
-    fig.suptitle(f'RaXPol PPI\nAvg. Elevation={np.mean(el):.2f}\n'+time.strftime('%d %b %Y %H:%M:%S UTC'))
-    fig.set_size_inches(1024*px, 1050*px)
-    fig.tight_layout()
-    fig.savefig(saveFilePath)
+                handle = ax.pcolormesh(lon, lat, colorvar, vmin=thisfield['vmin'], vmax=thisfield['vmax'], cmap=thisfield['cmap'], transform=ccrs.PlateCarree())
+                ax.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
+                fig.colorbar(handle, label=thisfield['label'])
+                idx = idx+1
+        fig.suptitle(f'RaXPol PPI\nAvg. Elevation={np.mean(el):.2f}\n'+time.strftime('%d %b %Y %H:%M:%S UTC'))
+        fig.set_size_inches(1024*px, 1050*px)
+        fig.tight_layout()
+        fig.savefig(saveFilePath)
+    elif '-A' in fileds[k]:
+        fig, axs = plt.subplots(3, 2)
+        idx = 0
+        for i in range(3):
+            for j in range(2):
+                ax = axs[i, j]
+                thisfield = all_fields[idx]
+                data = thisfield['data']
+
+                rng = np.matmul(data.Gate.data.reshape(-1, 1), data.GateWidth.data.reshape(1, -1))
+                az = np.tile(data.Azimuth.data, (rng.shape[0], 1))
+                eldat = np.tile(data.Elevation.data, (rng.shape[0], 1))
+
+                rcs = RadarCoordinateSystem(data.Latitude, data.Longitude, px_elevation_m)
+                tpcs = TangentPlaneCartesianSystem(data.Latitude, data.Longitude, px_elevation_m)
+                ecef_X, ecef_Y, ecef_Z = rcs.toECEF(rng, az, eldat)
+                tpcs_x, tpcs_y, tpcs_z = tpcs.fromECEF(ecef_X, ecef_Y, ecef_Z)
+
+                tpcs_x = tpcs_x.reshape(rng.shape)
+                tpcs_y = tpcs_y.reshape(rng.shape)
+                tpcs_z = tpcs_z.reshape(rng.shape)
+
+                ground_range = (tpcs_x**2 + tpcs_y**2)**0.5
+
+                colorvar = np.ma.masked_array(data[thisfield['varname']].data, data[thisfield['varname']].data <= -99900.0).T
+
+                handle = ax.pcolormesh(ground_range, tpcs_z, colorvar, vmin=thisfield['vmin'], vmax=thisfield['vmax'], cmap=thisfield['cmap'])
+                fig.colorbar(handle, label=thisfield['label'])
+                idx = idx+1
+        fig.suptitle(f'PX-1000 RHI\nAz={np.mean(az):.2f}\n'+time.strftime('%d %b %Y %H:%M:%S UTC'))
+        fig.set_size_inches(1024*px, 1050*px)
+        fig.tight_layout()
+        fig.savefig(saveFilePath)
+
 
 
 if __name__ == '__main__':

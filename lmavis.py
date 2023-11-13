@@ -18,7 +18,7 @@ import pyart
 
 
 if __name__ == '__main__':
-    caseType = 'highspeed' # 'iphone' 'highspeed'
+    caseType = 'iphone' # 'iphone' 'highspeed'
     if caseType == 'iphone':
         cases = [
             {
@@ -28,7 +28,8 @@ if __name__ == '__main__':
                 'lat_offset' : 0,
                 'lon_offset' : 0,
                 'start_offset' : -0.1e9,
-                'end_offset' : 0.1e9
+                'end_offset' : 0.1e9,
+                'px1k-dumb': [0, 0]
             }, {
                 'flid' : 13367,
                 'deltalat' : 0.2,
@@ -36,7 +37,8 @@ if __name__ == '__main__':
                 'lat_offset' : 0,
                 'lon_offset' : 0,
                 'start_offset' : -0.04e9,
-                'end_offset' : 0.006e9
+                'end_offset' : 0.006e9,
+                'px1k-dumb': [0, 0]
             }, {
                 'flid' : 14134,
                 'deltalat' : 0.2,
@@ -44,7 +46,8 @@ if __name__ == '__main__':
                 'lat_offset' : 0,
                 'lon_offset' : 0,
                 'start_offset' : -0.1e9,
-                'end_offset' : 0
+                'end_offset' : 0,
+                'px1k-dumb': [0, 0]
             }, {
                 'flid' : 22059,
                 'deltalat' : 0.25,
@@ -52,7 +55,8 @@ if __name__ == '__main__':
                 'lat_offset' : 0,
                 'lon_offset' : 0,
                 'start_offset' : -0.02e9,
-                'end_offset' : 0.25e9
+                'end_offset' : 0.25e9,
+                'px1k-dumb': [-3, 3]
             }, {
                 'flid' : 36458,
                 'deltalat' : 0.5,
@@ -60,7 +64,8 @@ if __name__ == '__main__':
                 'lat_offset' : 0,
                 'lon_offset' : 0,
                 'start_offset' : -0.02e9,
-                'end_offset' : 0.55e9
+                'end_offset' : 0.55e9,
+                'px1k-dumb': [0, 1]
             }, {
                 'flid' : 41141,
                 'deltalat' : 0.25,
@@ -127,7 +132,7 @@ if __name__ == '__main__':
     lmad = flash_stats(cluster_flashes(lmad))
 
     basepath = path.dirname(path.realpath(__file__))
-    outbasepath = path.join(basepath, 'cases'+caseType)
+    outbasepath = path.join(basepath, 'polarimetry-'+caseType)
 
     for i in range(len(cases)):
         case = cases[i]
@@ -164,65 +169,65 @@ if __name__ == '__main__':
         lmaPlot.fig.savefig(savePath)
         for el in np.arange(1, 30, 1.5):
             this_el_times = rax_times[f'{el:.1f}']
-            preceding_scan_time = [scan_time for scan_time in this_el_times if scan_time < time_start_dt][-1]
-            try:
-                following_scan_time = [scan_time for scan_time in this_el_times if scan_time > time_start_dt][0]
-            except IndexError:
-                continue
-            for field in radar_fields:
-                raxPrecDataPath = path.join(basepath, 'rax', f'RAXPOL-{preceding_scan_time.strftime('%Y%m%d-%H%M%S')}-E{el:.1f}-{field["suffix"]}.nc')
-                raxPrecData = xr.open_dataset(raxPrecDataPath)
-                raxFollowDataPath = path.join(basepath, 'rax', f'RAXPOL-{following_scan_time.strftime('%Y%m%d-%H%M%S')}-E{el:.1f}-{field["suffix"]}.nc')
-                raxFollowData = xr.open_dataset(raxFollowDataPath)
+            # preceding_scan_time = [scan_time for scan_time in this_el_times if scan_time < time_start_dt][-1]
+            # try:
+            #     following_scan_time = [scan_time for scan_time in this_el_times if scan_time > time_start_dt][0]
+            # except IndexError:
+            #     continue
+            # for field in radar_fields:
+            #     raxPrecDataPath = path.join(basepath, 'rax', f'RAXPOL-{preceding_scan_time.strftime('%Y%m%d-%H%M%S')}-E{el:.1f}-{field["suffix"]}.nc')
+            #     raxPrecData = xr.open_dataset(raxPrecDataPath)
+            #     raxFollowDataPath = path.join(basepath, 'rax', f'RAXPOL-{following_scan_time.strftime('%Y%m%d-%H%M%S')}-E{el:.1f}-{field["suffix"]}.nc')
+            #     raxFollowData = xr.open_dataset(raxFollowDataPath)
 
 
-                badPracticeContainer = [raxPrecData, '', raxFollowData]
+            #     badPracticeContainer = [raxPrecData, '', raxFollowData]
 
-                fig, axs = plt.subplots(1, 3, subplot_kw={'projection' : ccrs.PlateCarree()}, figsize=(15, 5))
+            #     fig, axs = plt.subplots(1, 3, subplot_kw={'projection' : ccrs.PlateCarree()}, figsize=(15, 5))
 
-                for i in [0, 2]:
-                    data = badPracticeContainer[i]
-                    ax = axs[i]
-                    t_start = pd.Timestamp(np.array([data.Time]).astype('datetime64[s]')[0]).to_pydatetime()
-                    rng = np.matmul(data.Gate.data.reshape(-1, 1), data.GateWidth.data.reshape(1, -1))
-                    az = np.tile(data.Azimuth.data, (rng.shape[0], 1))
-                    eldat = np.tile(data.Elevation.data, (rng.shape[0], 1))
-                    rcs = RadarCoordinateSystem(data.Latitude, data.Longitude, rax_elevation_m)
-                    lon, lat, alt = rcs.toLonLatAlt(rng, az, eldat)
-                    lon = np.array(lon).reshape(az.shape)
-                    lat = np.array(lat).reshape(az.shape)
-                    alt = np.array(alt).reshape(az.shape)
-
-
-                    colorvar = np.ma.masked_array(data[field['varname']].data, data[field['varname']].data <= -99900.0).T
-
-                    handle = ax.pcolormesh(lon, lat, colorvar, vmin=field['vmin'], vmax=field['vmax'], cmap=field['cmap'], transform=ccrs.PlateCarree())
-                    fig.colorbar(handle, label=field['label'], aspect=90)
-                    ax.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
-
-                    ax.scatter(lonSet, latSet, s=3, c='k', marker='.', transform=ccrs.PlateCarree(), alpha=0.1)
-
-                    ax.scatter(camera_lon, camera_lat, 100, 'goldenrod', '*', linewidths=.5, edgecolors='k', transform=ccrs.PlateCarree(), zorder=4)
-
-                    ax.set_title(f'RaXPol {t_start.strftime("%H:%M:%S")} UTC\nTarget elevation: {el:.1f}°\nActual elevation at az=0°: {data.isel(Azimuth=np.argmin(data.Azimuth.data)).Elevation.data:.1f}°')
-
-                    ax.set_xlim(lon_range)
-                    ax.set_ylim(lat_range)
-
-                lightningAx = axs[1]
-                deltaTs = (pd.to_datetime(timeSet) - pd.to_datetime(timeSet).reset_index(drop=True)[0]).dt.total_seconds().values
-                handle = lightningAx.scatter(lonSet, latSet, s=3, c=deltaTs, cmap='rainbow', transform=ccrs.PlateCarree(), alpha=0.5)
-                fig.colorbar(handle, label='Seconds since initiation', aspect=90)
-                lightningAx.set_title(f'Lightning Flash\n{time_start_dt.strftime('%H:%M:%S.%f')} - {time_end_dt.strftime('%H:%M:%S.%f')} UTC')
-                lightningAx.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
-                lightningAx.set_xlim(lon_range)
-                lightningAx.set_ylim(lat_range)
+            #     for i in [0, 2]:
+            #         data = badPracticeContainer[i]
+            #         ax = axs[i]
+            #         t_start = pd.Timestamp(np.array([data.Time]).astype('datetime64[s]')[0]).to_pydatetime()
+            #         rng = np.matmul(data.Gate.data.reshape(-1, 1), data.GateWidth.data.reshape(1, -1))
+            #         az = np.tile(data.Azimuth.data, (rng.shape[0], 1))
+            #         eldat = np.tile(data.Elevation.data, (rng.shape[0], 1))
+            #         rcs = RadarCoordinateSystem(data.Latitude, data.Longitude, rax_elevation_m)
+            #         lon, lat, alt = rcs.toLonLatAlt(rng, az, eldat)
+            #         lon = np.array(lon).reshape(az.shape)
+            #         lat = np.array(lat).reshape(az.shape)
+            #         alt = np.array(alt).reshape(az.shape)
 
 
-                radarOutPath = path.join(path.dirname(savePath), f'{el:.1f}', f'{field["suffix"]}.png')
-                Path(path.dirname(radarOutPath)).mkdir(parents=True, exist_ok=True)
-                fig.tight_layout()
-                fig.savefig(radarOutPath)
+            #         colorvar = np.ma.masked_array(data[field['varname']].data, data[field['varname']].data <= -99900.0).T
+
+            #         handle = ax.pcolormesh(lon, lat, colorvar, vmin=field['vmin'], vmax=field['vmax'], cmap=field['cmap'], transform=ccrs.PlateCarree())
+            #         fig.colorbar(handle, label=field['label'], aspect=90)
+            #         ax.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
+
+            #         ax.scatter(lonSet, latSet, s=3, c='k', marker='.', transform=ccrs.PlateCarree(), alpha=0.1)
+
+            #         ax.scatter(camera_lon, camera_lat, 100, 'goldenrod', '*', linewidths=.5, edgecolors='k', transform=ccrs.PlateCarree(), zorder=4)
+
+            #         ax.set_title(f'RaXPol {t_start.strftime("%H:%M:%S")} UTC\nTarget elevation: {el:.1f}°\nActual elevation at az=0°: {data.isel(Azimuth=np.argmin(data.Azimuth.data)).Elevation.data:.1f}°')
+
+            #         ax.set_xlim(lon_range)
+            #         ax.set_ylim(lat_range)
+
+            #     lightningAx = axs[1]
+            #     deltaTs = (pd.to_datetime(timeSet) - pd.to_datetime(timeSet).reset_index(drop=True)[0]).dt.total_seconds().values
+            #     handle = lightningAx.scatter(lonSet, latSet, s=3, c=deltaTs, cmap='rainbow', transform=ccrs.PlateCarree(), alpha=0.5)
+            #     fig.colorbar(handle, label='Seconds since initiation', aspect=90)
+            #     lightningAx.set_title(f'Lightning Flash\n{time_start_dt.strftime('%H:%M:%S.%f')} - {time_end_dt.strftime('%H:%M:%S.%f')} UTC')
+            #     lightningAx.add_feature(USCOUNTIES.with_scale('5m'), edgecolor='gray', linewidth=0.5)
+            #     lightningAx.set_xlim(lon_range)
+            #     lightningAx.set_ylim(lat_range)
+
+
+            #     radarOutPath = path.join(path.dirname(savePath), f'{el:.1f}', f'{field["suffix"]}.png')
+            #     Path(path.dirname(radarOutPath)).mkdir(parents=True, exist_ok=True)
+            #     fig.tight_layout()
+            #     fig.savefig(radarOutPath)
 
         pxpreceding_scan_time = [scan_time for scan_time in px_times if scan_time < time_start_dt][-1]
         pxfollowing_scan_time = [scan_time for scan_time in px_times if scan_time > time_start_dt][0]
@@ -265,8 +270,13 @@ if __name__ == '__main__':
 
                 colorvar = np.ma.masked_array(data[field['varname']].data, data[field['varname']].data <= -99900.0).T
 
-                handle = ax.pcolormesh(ground_range, tpcs_z, colorvar, vmin=field['vmin'], vmax=field['vmax'], cmap=field['cmap'])
+                handle = ax.pcolormesh(ground_range/1000, tpcs_z/1000, colorvar, vmin=field['vmin'], vmax=field['vmax'], cmap=field['cmap'])
                 fig2.colorbar(handle, label=field['label'], aspect=90)
+
+                ax.set_xlabel('Distance from radar (km)')
+                ax.set_ylabel('Altitude (km)')
+
+                ax.set_ylim(0, 13)
 
                 ax.set_title(f'PX-1000 {t_start.strftime("%H:%M:%S")} UTC\n{data.Azimuth.data[0]:.1f}° RHI')
                 scan_lon, scan_lat, _ = rcs.toLonLatAlt(rng, az, eldat)
