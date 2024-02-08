@@ -26,8 +26,6 @@ def make_cfradial_format_from_radars(datasets, time_spacing_to_next_scan):
                     'units' : ds.attrs['Unit-value'],
                     'standard_name' : 'equivalent_reflectivity_factor',
                     'long_name' : 'Reflectivity',
-                    'valid_max' : 94.5,
-                    'valid_min' : -32.0,
                     'coordinates' : 'elevation azimuth range',
                     '_FillValue' : -9999,
                     'data' : datafilled
@@ -59,8 +57,6 @@ def make_cfradial_format_from_radars(datasets, time_spacing_to_next_scan):
                     'units' : ds.attrs['Unit-value'],
                     'standard_name' : 'log_differential_reflectivity_hv',
                     'long_name' : 'log_differential_reflectivity_hv',
-                    'valid_max' : 7.9375,
-                    'valid_min' : -7.9375,
                     'coordinates' : 'elevation azimuth range',
                     '_FillValue' : -9999,
                     'data' : datafilled
@@ -87,6 +83,72 @@ def make_cfradial_format_from_radars(datasets, time_spacing_to_next_scan):
                     '_FillValue' : -9999,
                     'data' : datafilled
                 }
+            case 'KDP':
+                if ds.attrs['Unit-value'] == 'DegreesPerMeter':
+                    datafilled = datafilled / 1000
+                    this_unit = 'degrees/km'
+                else:
+                    this_unit = ds.attrs['Unit-value']
+                fields['specific_differential_phase'] = {
+                    'units' : this_unit,
+                    'standard_name' : 'specific_differential_phase_hv',
+                    'long_name' : 'Specific differential phase (KDP)',
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            case 'Co-cross_Differential_Phase_H':
+                fields['cross_polar_differential_phase'] = {
+                    'units' : ds.attrs['Unit-value'],
+                    'standard_name' : 'cross_polar_differential_phase_h',
+                    'long_name' : 'cross_polar_differential_phase_h',
+                    'valid_max' : np.pi,
+                    'valid_min' : -np.pi,
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            case 'Co-cross_Correlation_Coefficient_H':
+                fields['co_to_cross_polar_correlation_ratio_h'] = {
+                    'units' : ds.attrs['Unit-value'],
+                    'standard_name' : 'co_to_cross_polar_correlation_ratio_h',
+                    'long_name' : 'co_to_cross_polar_correlation_ratio_h',
+                    'valid_max' : 1.0,
+                    'valid_min' : 0.0,
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            case 'Co-cross_Correlation_Coefficient_V':
+                fields['co_to_cross_polar_correlation_ratio_v'] = {
+                    'units' : ds.attrs['Unit-value'],
+                    'standard_name' : 'co_to_cross_polar_correlation_ratio_v',
+                    'long_name' : 'co_to_cross_polar_correlation_ratio_v',
+                    'valid_max' : 1.0,
+                    'valid_min' : 0.0,
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            case 'Linear_Depolarization_Ratio_H':
+                fields['linear_depolarization_ratio_h'] = {
+                    'units' : ds.attrs['Unit-value'],
+                    'standard_name' : 'log_linear_depolarization_ratio_h',
+                    'long_name' : 'Linear depolarization ratio horizontal',
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            case 'Linear_Depolarization_Ratio_V':
+                fields['linear_depolarization_ratio_v'] = {
+                    'units' : ds.attrs['Unit-value'],
+                    'standard_name' : 'log_linear_depolarization_ratio_v',
+                    'long_name' : 'Linear depolarization ratio vertical',
+                    'coordinates' : 'elevation azimuth range',
+                    '_FillValue' : -9999,
+                    'data' : datafilled
+                }
+            
         files_to_combine.append(ds)
     time_start = dt.fromtimestamp(ds.attrs['Time'], UTC)
     num_rays = ds[list(ds.coords)[0]].data.shape[0]
@@ -101,8 +163,7 @@ def make_cfradial_format_from_radars(datasets, time_spacing_to_next_scan):
         'comment' : 'Coordinate variable for time. Time at the center of each ray, in fractional seconds since the global variable time_coverage_start',
         'data' : times_at_rays - ds.attrs['Time']
     }
-
-    rng = np.matmul(ds.Gate.data.reshape(-1, 1), ds.GateWidth.data.reshape(1, -1))+ds.attrs['RangeToFirstGate']
+    rng = np.matmul(ds.Gate.data.reshape(-1, 1), ds.GateWidth.data.reshape(1, -1))+ ds.attrs['RangeToFirstGate'] + np.median(ds.GateWidth.data)/2
     range_dict = {
         'units' : 'meters',
         'standard_name' : 'projection_range_coordinate',
