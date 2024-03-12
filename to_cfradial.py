@@ -62,8 +62,13 @@ def make_cfradial_format_from_radars(datasets, time_spacing_to_next_scan):
                     'data' : datafilled
                 }
             case 'PhiDP':
+                if ds.attrs['Unit-value'] == 'Radians':
+                    unit = 'degrees'
+                    datafilled = datafilled * 180/np.pi
+                else:
+                    unit = ds.attrs['Unit-value']
                 fields['differential_phase'] = {
-                    'units' : ds.attrs['Unit-value'],
+                    'units' : unit,
                     'standard_name' : 'differential_phase_hv',
                     'long_name' : 'differential_phase_hv',
                     'valid_max' : np.pi,
